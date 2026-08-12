@@ -19,8 +19,8 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.homepage.rule=Host(`${DOMAIN_DASH:-home.lan}`) || Host(`dash.lan`)"
       - "traefik.http.routers.homepage.entrypoints=web"
-      # SSO Authentication via Authentik ForwardAuth Middleware
-      - "traefik.http.routers.homepage.middlewares=authentik@file"
+      # SSO Authentication via Authelia ForwardAuth Middleware
+      - "traefik.http.routers.homepage.middlewares=authelia@file"
       - "traefik.http.services.homepage.loadbalancer.server.port=3000"
 
 networks:

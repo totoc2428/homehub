@@ -23,6 +23,7 @@ services:
     volumes:
       - './pihole/etc-pihole:/etc/pihole'
       - './pihole/etc-dnsmasq.d:/etc/dnsmasq.d'
+      - './pihole/custom-theme.css:/var/www/html/admin/custom-theme.css:ro'
 
 networks:
   lan_physique:

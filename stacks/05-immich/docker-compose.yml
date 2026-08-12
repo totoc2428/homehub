@@ -31,8 +31,8 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.immich.rule=Host(`${DOMAIN_PHOTOS:-photos.lan}`)"
       - "traefik.http.routers.immich.entrypoints=web"
-      # SSO Authentication via Authentik ForwardAuth Middleware
-      - "traefik.http.routers.immich.middlewares=authentik@file"
+      # SSO Authentication via Authelia ForwardAuth Middleware
+      - "traefik.http.routers.immich.middlewares=authelia@file"
       - "traefik.http.services.immich.loadbalancer.server.port=2283"
       - "traefik.docker.network=proxy"
 
