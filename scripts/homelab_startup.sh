@@ -76,7 +76,14 @@ else
     log_error "Warning: No .env file found at ${ENV_FILE}. Using container defaults."
 fi
 
-# 4. SPIN UP STACKS
+# 4. DYNAMICALLY GENERATE USER CREDENTIALS & AUTHELIA DATABASE
+GENERATE_SCRIPT="${TARGET_DIR}/../scripts/generate_authelia_users.py"
+if [[ -f "${GENERATE_SCRIPT}" ]]; then
+    log "Executing dynamic user & service account initialization (${GENERATE_SCRIPT})..."
+    /usr/bin/python3 "${GENERATE_SCRIPT}" || log_error "Warning: User generation script exited with warnings."
+fi
+
+# 5. SPIN UP STACKS
 log "Spinning up HomeLab container stacks (docker compose up -d)..."
 docker compose --env-file "${ENV_FILE}" up -d || {
     log_error "Docker compose up -d encountered errors during execution."

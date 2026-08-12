@@ -1,0 +1,48 @@
+# ==============================================================================
+# OpenMediaVault HomeLab - Central User Registry
+# Location: stacks/users.yaml
+# Roles available: administrator, manager, standard, guest
+# ==============================================================================
+
+users:
+  - username: "charles.coude"
+    displayname: "Charles Coudé"
+    email: "charles.coude@example.com"
+    phone: "+33600000001"
+    role: "administrator"
+
+  - username: "dominique.coude"
+    displayname: "Dominique Coudé"
+    email: "dominique.coude@example.com"
+    phone: "+33600000002"
+    role: "administrator"
+
+  - username: "annouk.coude"
+    displayname: "Annouk Coudé"
+    email: "annouk.coude@example.com"
+    phone: "+33600000003"
+    role: "manager"
+
+  - username: "anne.coude"
+    displayname: "Anne Coudé"
+    email: "anne.coude@example.com"
+    phone: "+33600000004"
+    role: "standard"
+
+  - username: "agathe.coude"
+    displayname: "Agathe Coudé"
+    email: "agathe.coude@example.com"
+    phone: "+33600000005"
+    role: "standard"
+
+  - username: "hermine.coude"
+    displayname: "Hermine Coudé"
+    email: "hermine.coude@example.com"
+    phone: "+33600000006"
+    role: "standard"
+
+  - username: "guest_user"
+    displayname: "Invité Famille"
+    email: "guest@example.com"
+    phone: "+33600000000"
+    role: "guest"

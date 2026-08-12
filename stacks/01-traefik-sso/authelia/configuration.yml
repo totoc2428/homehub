@@ -1,5 +1,5 @@
 # ==============================================================================
-# Authelia SSO Main Configuration
+# Authelia SSO Main Configuration - 4-Tier Access Control Policy
 # Location: stacks/01-traefik-sso/authelia/configuration.yml
 # ==============================================================================
 
@@ -43,23 +43,39 @@ access_control:
     - domain: auth.lan
       policy: bypass
 
-    # 2. Family group access for general services (Homepage & Immich)
-    - domain: home.lan
-      policy: one_factor
-      subject: "group:Family"
-
-    - domain: photos.lan
-      policy: one_factor
-      subject: "group:Family"
-
-    # 3. Admin-only access restriction (Traefik Dashboard & OpenMediaVault)
+    # 2. Administrator Level: Full access to all applications and administrative portals
     - domain: traefik.lan
       policy: one_factor
-      subject: "group:admin"
+      subject: "group:administrator"
 
     - domain: data.lan
       policy: one_factor
-      subject: "group:admin"
+      subject: "group:administrator"
+
+    - domain: portainer.lan
+      policy: one_factor
+      subject: "group:administrator"
+
+    # 3. Manager Level: Access to management endpoints and standard applications
+    - domain: manager.lan
+      policy: one_factor
+      subject: "group:manager"
+
+    # 4. Standard Level: Basic user access to family applications (Homepage, Immich, Home Assistant)
+    - domain: home.lan
+      policy: one_factor
+      subject:
+        - "group:standard"
+        - "group:guest"
+
+    - domain: photos.lan
+      policy: one_factor
+      subject: "group:standard"
+
+    # 5. Guest Level: Restricted access (e.g. read-only public guest page)
+    - domain: guest.lan
+      policy: one_factor
+      subject: "group:guest"
 
 session:
   name: authelia_session

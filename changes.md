@@ -8,53 +8,42 @@
 
 ## 1. Overview of Accomplishments
 
-The HomeLab architecture has been refactored to be fully **"Plug & Play"**, secured with **Authelia Single Sign-On (SSO)** integrated via **Traefik ForwardAuth**, unified visually with a **Google/Immich App Launcher Dashboard**, and styled consistently across services (Pi-hole, Home Assistant).
+The HomeLab architecture has been upgraded with **Automated User Onboarding & 4-Tier Access Control**. Hardcoded accounts in static configuration files have been completely eliminated and replaced by a central user source registry (`users.yaml`), an `admin_service` system account, and an automated Python initialization script (`generate_authelia_users.py`).
 
-### Key Infrastructure & UI/UX Improvements:
-- **Lightweight File-Backed SSO**: Authelia configured with file database (`users_database.yml`) managing family accounts (`charles.coude`, `annouk.coude`, `anne.coude`, `agathe.coude`, `hermine.coude`, `dominique.coude`).
-- **Role-Based Access Control**:
-  - `Family` group: Access to Homepage (`home.lan`) and Immich (`photos.lan`).
-  - `admin` group (`charles.coude`, `dominique.coude`): Strict restricted access to administrative portals (Traefik Dashboard `traefik.lan`, OpenMediaVault `data.lan`).
-- **Unified Modern Dashboard**: Homepage styled as a Google App Launcher with Material Design 3 / Immich glassmorphic cards (`custom.css`), rounded corners (20px), subtle neon glow effects, and live widgets.
-- **UI Theme Harmonization**:
-  - **Pi-hole**: Dark material theme injected via volume mount (`custom-theme.css`).
-  - **Home Assistant**: Google Theme / Material 3 YAML instructions provided for HACS.
-- **Strict Persistence & Zero Data Loss**: Every service uses explicit bind mounts (`./authelia/config:/config`, `./stacks/02-homepage/config:/app/config`).
-
----
-
-## 2. Inventory of Created Files & Stacks
-
-### 2.1 Master & Modular Docker Stacks (`docker-compose.yml` & `stacks/`)
-
-- [`docker-compose.yml`](file:///c:/Users/charl/Documents/code/project/openmedia/docker-compose.yml): Unified Docker Compose file aggregating all services with Authelia SSO and Homepage.
-- [`stacks/01-traefik-sso/docker-compose.yml`](file:///c:/Users/charl/Documents/code/project/openmedia/stacks/01-traefik-sso/docker-compose.yml): Traefik v3 reverse proxy paired with Authelia SSO.
-- [`stacks/01-traefik-sso/authelia/configuration.yml`](file:///c:/Users/charl/Documents/code/project/openmedia/stacks/01-traefik-sso/authelia/configuration.yml): Main Authelia config specifying SQLite storage, argon2id password hashing, and domain rules.
-- [`stacks/01-traefik-sso/authelia/users_database.yml`](file:///c:/Users/charl/Documents/code/project/openmedia/stacks/01-traefik-sso/authelia/users_database.yml): Local user database with Argon2id password hashes for family and admin accounts.
-- [`stacks/01-traefik-sso/traefik/dynamic/middleware.yml`](file:///c:/Users/charl/Documents/code/project/openmedia/stacks/01-traefik-sso/traefik/dynamic/middleware.yml): Traefik dynamic file configuration defining the `authelia` ForwardAuth middleware (`http://authelia:9091/api/verify?rd=http://auth.lan/`).
-- [`stacks/02-homepage/docker-compose.yml`](file:///c:/Users/charl/Documents/code/project/openmedia/stacks/02-homepage/docker-compose.yml): Homepage dashboard container setup.
-- [`stacks/02-homepage/config/settings.yaml`](file:///c:/Users/charl/Documents/code/project/openmedia/stacks/02-homepage/config/settings.yaml): Global layout settings for Homepage.
-- [`stacks/02-homepage/config/services.yaml`](file:///c:/Users/charl/Documents/code/project/openmedia/stacks/02-homepage/config/services.yaml): Google App Launcher service cards and live widgets (Immich, HA, Pi-hole, Traefik, Authelia, OMV).
-- [`stacks/02-homepage/config/custom.css`](file:///c:/Users/charl/Documents/code/project/openmedia/stacks/02-homepage/config/custom.css): Google / Immich Material glassmorphism styling file.
-- [`stacks/03-pihole/docker-compose.yml`](file:///c:/Users/charl/Documents/code/project/openmedia/stacks/03-pihole/docker-compose.yml): Pi-hole stack with custom theme volume injection.
-- [`stacks/03-pihole/pihole/custom-theme.css`](file:///c:/Users/charl/Documents/code/project/openmedia/stacks/03-pihole/pihole/custom-theme.css): Pi-hole dark material theme.
-- [`stacks/04-homeautomation/docker-compose.yml`](file:///c:/Users/charl/Documents/code/project/openmedia/stacks/04-homeautomation/docker-compose.yml): Home Assistant, Matter Server, OpenThread, and Mosquitto MQTT.
-- [`stacks/05-immich/docker-compose.yml`](file:///c:/Users/charl/Documents/code/project/openmedia/stacks/05-immich/docker-compose.yml): Immich photo server stack protected by Authelia ForwardAuth labels.
+### Key Infrastructure & Security Improvements:
+- **Central User Registry (`users.yaml`)**: Serves as the single source of truth for user accounts (`username`, `displayname`, `email`, `phone`, `role`).
+- **Internal Service Account (`admin_service`)**: System account with strong random password auto-generated during initial boot, saved to `.env` (`ADMIN_SERVICE_PASSWORD`) for cron jobs, API scripts, and backup automation.
+- **Dynamic SSO Initialization (`scripts/generate_authelia_users.py`)**: Python script running on host boot before Authelia starts, generating Argon2id password hashes, preserving credentials idempotently (`users_credentials.json`), and dynamically compiling `users_database.yml`.
+- **4-Tier Access Control Policy**:
+  - `administrator`: Full access to all applications and administrative portals (`data.lan`, `traefik.lan`, `portainer.lan`). Assigned to `charles.coude`, `dominique.coude`, and `admin_service`.
+  - `manager`: Access to standard applications and management configuration endpoints (`annouk.coude`).
+  - `standard`: Basic user access to family applications (`home.lan`, `photos.lan`, Home Assistant). Assigned to `anne.coude`, `agathe.coude`, `hermine.coude`.
+  - `guest`: Restricted read-only access for guest users (`guest_user`).
 
 ---
 
-## 3. Deployment & Quick Start Guide
+## 2. Inventory of Created Files & Automation Scripts
+
+### 2.1 User Registry & SSO Automation
+
+- [`users.yaml`](file:///c:/Users/charl/Documents/code/project/openmedia/users.yaml) & [`stacks/users.yaml`](file:///c:/Users/charl/Documents/code/project/openmedia/stacks/users.yaml): Central user source database.
+- [`scripts/generate_authelia_users.py`](file:///c:/Users/charl/Documents/code/project/openmedia/scripts/generate_authelia_users.py): Idempotent Python initializer script compiling `users_database.yml` and managing `admin_service` credentials.
+- [`stacks/01-traefik-sso/authelia/users_credentials.json`](file:///c:/Users/charl/Documents/code/project/openmedia/stacks/01-traefik-sso/authelia/users_credentials.json): Secure persistent store for generated temporary user credentials.
+- [`stacks/01-traefik-sso/authelia/users_database.yml`](file:///c:/Users/charl/Documents/code/project/openmedia/stacks/01-traefik-sso/authelia/users_database.yml): Dynamically compiled Authelia user database.
+- [`stacks/01-traefik-sso/authelia/configuration.yml`](file:///c:/Users/charl/Documents/code/project/openmedia/stacks/01-traefik-sso/authelia/configuration.yml): Updated 4-tier domain access control policy rules.
+- [`scripts/homelab_startup.sh`](file:///c:/Users/charl/Documents/code/project/openmedia/scripts/homelab_startup.sh): Host boot script invoking `generate_authelia_users.py` prior to `docker compose up -d`.
+
+---
+
+## 3. Quick Start & Deployment
 
 ```bash
-# 1. Environment file setup
-cp .env.exemple .env
-cp .env.exemple stacks/.env
+# 1. Add/modify users in users.yaml
+nano users.yaml
 
-# 2. Spin up containers
+# 2. Run the dynamic user generator
+py scripts/generate_authelia_users.py
+
+# 3. Spin up the HomeLab stack
 docker compose up -d
-
-# 3. Enable host boot service
-sudo cp scripts/homelab-stacks.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now homelab-stacks.service
 ```
