@@ -18,5 +18,10 @@
 # Ignore legacy/archived folder
 archive/
 
+# Ignore Python bytecode & cache
+__pycache__/
+*.pyc
+*.pyo
+
 # Ignore runtime log files
 *.log
