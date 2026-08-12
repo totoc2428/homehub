@@ -1,0 +1,162 @@
+- id: "1783001000001"
+  alias: "Chambre Charles - Plafonnier nuit 50% + bouton 2 boost"
+  description: "La nuit, allumage plafonnier limite a 50%. Appui bouton (2): 100% avec blanc chaud leger."
+  mode: restart
+  triggers:
+    - trigger: state
+      entity_id: light.chambre_de_charles_plafonnier
+      from: "off"
+      to: "on"
+      id: plaf_on
+    - trigger: state
+      entity_id: event.chambre_de_charles_interrupteur_charles_bouton_2
+      id: btn2
+  conditions: []
+  actions:
+    - choose:
+        - conditions:
+            - condition: trigger
+              id: plaf_on
+            - condition: state
+              entity_id: sun.sun
+              state: below_horizon
+          sequence:
+            - action: light.turn_on
+              target:
+                entity_id: light.chambre_de_charles_plafonnier
+              data:
+                brightness_pct: 50
+                transition: 1
+        - conditions:
+            - condition: trigger
+              id: btn2
+            - condition: template
+              value_template: "{{ trigger.to_state.attributes.event_type == 'multi_press_1' }}"
+          sequence:
+            - action: light.turn_on
+              target:
+                entity_id: light.chambre_de_charles_plafonnier
+              data:
+                brightness_pct: 100
+                color_temp_kelvin: 3000
+                transition: 1
+      default: []
+
+- id: "1783001000002"
+  alias: "Chambre Charles - Ambiance dynamique jour vers nuit"
+  description: "A 10h: blanc. A partir de 1h avant coucher: plus chaud + baisse progressive jusqu'a 50%, puis stabilise."
+  mode: queued
+  triggers:
+    - trigger: time
+      at: "10:00:00"
+      id: t10
+    - trigger: sun
+      event: sunset
+      offset: "-01:00:00"
+      id: pre_sunset
+    - trigger: sun
+      event: sunset
+      id: sunset
+    - trigger: time_pattern
+      minutes: "/10"
+      id: tick
+    - trigger: state
+      entity_id:
+        - light.chambre_de_charles_plafonnier
+        - light.chambre_de_charles_lampe_de_chevet
+      from: "off"
+      to: "on"
+      id: light_on
+  conditions: []
+  actions:
+    - variables:
+        sunset: "{{ as_timestamp(state_attr('sun.sun','next_setting')) }}"
+        nowts: "{{ as_timestamp(now()) }}"
+        start: "{{ as_timestamp(state_attr('sun.sun','next_setting')) - 3600 }}"
+        in_window: "{{ nowts >= start and nowts < sunset }}"
+        after_sunset: "{{ is_state('sun.sun','below_horizon') }}"
+        warm_mired: "{{ (250 + ((nowts - start) / 3600) * 120) | round(0) if in_window else (370 if after_sunset else 250) }}"
+        bri_pct: "{{ (100 - ((nowts - start) / 3600) * 50) | round(0) if in_window else (50 if after_sunset else 100) }}"
+    - repeat:
+        for_each:
+          - light.chambre_de_charles_plafonnier
+          - light.chambre_de_charles_lampe_de_chevet
+        sequence:
+          - condition: template
+            value_template: "{{ is_state(repeat.item, 'on') }}"
+          - action: light.turn_on
+            target:
+              entity_id: "{{ repeat.item }}"
+            data:
+              color_temp: "{{ warm_mired | int }}"
+              brightness_pct: "{{ bri_pct | int }}"
+              transition: 2
+
+- id: "1783001000004"
+  alias: "Lumières au réveil"
+  description: "Chambre de Charles: 30 min avant alarme S21+, lumières a 1% puis progression vers 100% et 3000K."
+  mode: single
+  triggers:
+    - trigger: time_pattern
+      minutes: "/1"
+  conditions:
+    - condition: template
+      value_template: >-
+        {% set alarm = states('sensor.s21_de_charles_next_alarm') %}
+        {% set pkg = state_attr('sensor.s21_de_charles_next_alarm', 'Package') | default('', true) %}
+        {{
+          alarm not in ['unknown', 'unavailable', 'none', '']
+          and pkg == 'com.sec.android.app.clockpackage'
+          and (as_timestamp(alarm) - as_timestamp(now())) <= 1800
+          and (as_timestamp(alarm) - as_timestamp(now())) > 1740
+        }}
+  actions:
+    - variables:
+        target_lights:
+          - light.chambre_de_charles_plafonnier
+          - light.chambre_de_charles_lampe_de_chevet
+    - repeat:
+        for_each: "{{ target_lights }}"
+        sequence:
+          - action: light.turn_on
+            target:
+              entity_id: "{{ repeat.item }}"
+            data:
+              brightness_pct: 1
+              color_temp_kelvin: "{{ state_attr(repeat.item, 'min_color_temp_kelvin') | int(2000) }}"
+              transition: 1
+    - repeat:
+        count: 30
+        sequence:
+          - delay: "00:01:00"
+          - variables:
+              step: "{{ repeat.index }}"
+              progress: "{{ (step / 30) | float }}"
+              eased: "{{ (progress * progress) | float }}"
+              bri: "{{ (1 + (eased * 99)) | round(0, 'ceil') | int }}"
+          - repeat:
+              for_each: "{{ target_lights }}"
+              sequence:
+                - variables:
+                    start_kelvin: "{{ state_attr(repeat.item, 'min_color_temp_kelvin') | int(2000) }}"
+                    kelvin: "{{ (start_kelvin + (eased * (3000 - start_kelvin))) | round(0) | int }}"
+                - action: light.turn_on
+                  target:
+                    entity_id: "{{ repeat.item }}"
+                  data:
+                    brightness_pct: "{{ bri }}"
+                    color_temp_kelvin: "{{ kelvin }}"
+                    transition: 55
+    - action: notify.mobile_app_s21_de_charles
+      data:
+        message: "command_volume_level"
+        data:
+          media_stream: "music"
+          volume_level: 11
+    - action: notify.mobile_app_s21_de_charles
+      data:
+        message: "command_activity"
+        data:
+          intent_action: "android.intent.action.VIEW"
+          intent_uri: "http://stream.europe1.fr/europe1.mp3"
+          intent_package_name: "org.videolan.vlc"

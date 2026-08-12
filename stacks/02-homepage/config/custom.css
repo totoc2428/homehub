@@ -1,0 +1,48 @@
+/* Modern Minimalist Glassmorphism Theme (Google / Immich Style) */
+
+:root {
+  --bg-primary: #0f172a;
+  --card-bg: rgba(30, 41, 59, 0.75);
+  --card-border: rgba(255, 255, 255, 0.08);
+  --card-hover-border: rgba(59, 130, 246, 0.5);
+  --accent-color: #4f46e5;
+  --accent-gradient: linear-gradient(135deg, #6366f1 0%, #3b82f6 100%);
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-main);
+}
+
+.service-card {
+  background: var(--card-bg) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--card-border) !important;
+  border-radius: 16px !important;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.3) !important;
+}
+
+.service-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--card-hover-border) !important;
+  box-shadow: 0 12px 24px -4px rgba(59, 130, 246, 0.25) !important;
+}
+
+.service-card img {
+  border-radius: 8px;
+}
+
+.category-title {
+  font-size: 1.25rem !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.02em !important;
+  color: var(--text-main) !important;
+  border-bottom: 2px solid rgba(99, 102, 241, 0.3);
+  padding-bottom: 6px;
+  margin-bottom: 16px;
+}

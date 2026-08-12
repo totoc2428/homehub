@@ -1,0 +1,12 @@
+alias: "Réveil Europe 1"
+trigger:
+  - platform: time
+    at: sensor.nom_du_telephone_next_alarm
+action:
+  - action: notify.mobile_app_nom_du_telephone
+    data:
+      message: "command_activity"
+      title: "http://stream.europe1.fr/europe1.mp3" # Flux direct Europe 1
+      data:
+        channel: "org.videolan.vlc" # L'application VLC doit être installée
+        tag: "android.intent.action.VIEW"

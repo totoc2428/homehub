@@ -1,0 +1,76 @@
+# ==============================================================================
+# Stack 05: Immich Media Server (Behind Traefik + SSO)
+# Location: stacks/05-immich/docker-compose.yml
+# ==============================================================================
+
+services:
+  # --- IMMICH WEB SERVER ---
+  immich-server:
+    container_name: immich_server
+    image: ghcr.io/immich-app/immich-server:release
+    command: ["start.sh", "immich"]
+    volumes:
+      - ./upload:/usr/src/app/upload
+      - /etc/localtime:/etc/localtime:ro
+      - ${PHOTOS_MOUNT_POINT:-/srv/dev-disk-by-uuid-52E654B8E6549E53}/:/usr/src/app/external:ro
+    environment:
+      DB_PASSWORD: ${IMMICH_DB_PASSWORD:-immich_db_password_change_me}
+      DB_USERNAME: ${IMMICH_DB_USER:-postgres}
+      DB_DATABASE_NAME: ${IMMICH_DB_NAME:-immich}
+      DB_HOSTNAME: immich_postgres
+      REDIS_HOSTNAME: immich_redis
+      TZ: ${TZ:-Europe/Paris}
+    depends_on:
+      - immich-redis
+      - immich-postgres
+    restart: always
+    networks:
+      - immich_internal
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.immich.rule=Host(`${DOMAIN_PHOTOS:-photos.lan}`)"
+      - "traefik.http.routers.immich.entrypoints=web"
+      # SSO Authentication via Authentik ForwardAuth Middleware
+      - "traefik.http.routers.immich.middlewares=authentik@file"
+      - "traefik.http.services.immich.loadbalancer.server.port=2283"
+      - "traefik.docker.network=proxy"
+
+  # --- IMMICH MACHINE LEARNING ---
+  immich-machine-learning:
+    container_name: immich_machine_learning
+    image: ghcr.io/immich-app/immich-machine-learning:release
+    volumes:
+      - ./model-cache:/cache
+    restart: always
+    networks:
+      - immich_internal
+
+  # --- IMMICH REDIS CACHE ---
+  immich-redis:
+    container_name: immich_redis
+    image: redis:6.2-alpine
+    restart: always
+    networks:
+      - immich_internal
+
+  # --- IMMICH DATABASE (POSTGRESQL + PGVECTO-RS) ---
+  immich-postgres:
+    container_name: immich_postgres
+    image: tensorchord/pgvecto-rs:pg14-v0.2.0
+    environment:
+      POSTGRES_PASSWORD: ${IMMICH_DB_PASSWORD:-immich_db_password_change_me}
+      POSTGRES_USER: ${IMMICH_DB_USER:-postgres}
+      POSTGRES_DB: ${IMMICH_DB_NAME:-immich}
+    volumes:
+      - ./postgres:/var/lib/postgresql/data
+    restart: always
+    networks:
+      - immich_internal
+
+networks:
+  immich_internal:
+    driver: bridge
+  proxy:
+    external: true
+    name: proxy

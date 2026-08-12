@@ -1,0 +1,22 @@
+# ==============================================================================
+# Git Ignore Configuration - OpenMediaVault HomeLab Architecture
+# ==============================================================================
+
+# Ignore sensitive environment files containing credentials/tokens
+.env
+*.env
+**/.env
+.env.local
+.env.*.local
+
+# Allow tracked template / example environment files
+!.env.exemple
+!.env.example
+!*.env.exemple
+!*.env.example
+
+# Ignore legacy/archived folder
+archive/
+
+# Ignore runtime log files
+*.log

@@ -1,0 +1,75 @@
+# ==============================================================================
+# Stack 04: Home Automation (Home Assistant, Mosquitto, Matter, OpenThread)
+# Location: stacks/04-homeautomation/docker-compose.yml
+# ==============================================================================
+
+services:
+  # --- HOME ASSISTANT CORE ---
+  homeassistant:
+    container_name: homeassistant
+    image: ghcr.io/home-assistant/home-assistant:stable
+    restart: unless-stopped
+    network_mode: host
+    privileged: true
+    environment:
+      - TZ=${TZ:-Europe/Paris}
+      - USB_ZIGBEE=${USB_ZIGBEE}
+    volumes:
+      - ./homeassistant/config:/config
+      - /etc/localtime:/etc/localtime:ro
+      - /run/dbus:/run/dbus:ro
+      - /dev/serial/by-path:/dev/serial/by-path
+    devices:
+      - ${USB_ZIGBEE:-/dev/serial/by-path/pci-0000:00:1a.0-usb-0:1.2:1.0-port0}:${USB_ZIGBEE:-/dev/serial/by-path/pci-0000:00:1a.0-usb-0:1.2:1.0-port0}
+
+  # --- MOSQUITTO MQTT BROKER ---
+  mosquitto:
+    container_name: mosquitto
+    image: eclipse-mosquitto:latest
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto/config:/mosquitto/config
+      - ./mosquitto/data:/mosquitto/data
+      - ./mosquitto/log:/mosquitto/log
+
+  # --- PYTHON MATTER SERVER ---
+  matter-server:
+    container_name: matter-server
+    image: ghcr.io/home-assistant-libs/python-matter-server:stable
+    restart: unless-stopped
+    network_mode: host
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    security_opt:
+      - apparmor=unconfined
+    volumes:
+      - ./matter/data:/data
+      - /run/dbus:/run/dbus:ro
+    command: ["--storage-path", "/data", "--paa-root-cert-dir", "/data/credentials", "--primary-interface", "${PHYSICAL_INTERFACE:-enp4s0}"]
+
+  # --- OPENTHREAD BORDER ROUTER (OTBR) ---
+  openthread:
+    container_name: openthread
+    image: openthread/otbr:latest
+    restart: unless-stopped
+    network_mode: host
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    environment:
+      - WEB_GUI=0
+      - REST_API=1
+      - FIREWALL=0
+      - INFRA_IF_NAME=${PHYSICAL_INTERFACE:-enp4s0}
+      - BACKBONE_INTERFACE=${PHYSICAL_INTERFACE:-enp4s0}
+      - USB_THREAD=${USB_THREAD}
+    volumes:
+      - ./openthread_data:/var/lib/thread
+    devices:
+      - ${USB_THREAD:-/dev/serial/by-path/pci-0000:00:1a.0-usb-0:1.1:1.0-port0}:/dev/ttyThread
+    command: ["--radio-url", "spinel+hdlc+uart:///dev/ttyThread?uart-baudrate=230400&uart-flow-control"]

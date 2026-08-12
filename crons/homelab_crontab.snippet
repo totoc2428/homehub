@@ -1,0 +1,16 @@
+# ==============================================================================
+# HomeLab Host Crontab Snippet (Debian 13 OpenMediaVault)
+# Location: /etc/crontab or root crontab (`sudo crontab -e`)
+# ==============================================================================
+
+# 1. System Compressed Archive Backup (Daily at 05:00)
+00 05 * * * root /bin/bash /opt/openmedia/scripts/backup_system_photos.sh system >> /var/log/homelab_backup.log 2>&1
+
+# 2. Photos Incremental Rsync Backup & Family Permissions Enforcement (Daily at 05:30)
+30 05 * * * root /bin/bash /opt/openmedia/scripts/backup_system_photos.sh photos >> /var/log/homelab_backup.log 2>&1
+
+# 3. Immich External Library Forced Scan (Daily at 06:00)
+00 06 * * * root /bin/bash /opt/openmedia/scripts/immich_scan_external.sh >> /var/log/immich_scan.log 2>&1
+
+# 4. Immich Unassigned Assets Auto-Album Sync (Daily at 06:30)
+30 06 * * * root /usr/bin/python3 /opt/openmedia/scripts/immich_auto_album.py >> /var/log/immich_album.log 2>&1

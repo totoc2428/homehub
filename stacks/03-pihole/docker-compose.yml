@@ -1,0 +1,36 @@
+# ==============================================================================
+# Stack 03: Pi-hole DNS & DHCP (Macvlan)
+# Location: stacks/03-pihole/docker-compose.yml
+# ==============================================================================
+
+services:
+  pihole:
+    container_name: pihole
+    image: pihole/pihole:latest
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    networks:
+      lan_physique:
+        ipv4_address: ${PIHOLE_IP:-192.168.1.53}
+    environment:
+      TZ: '${TZ:-Europe/Paris}'
+      WEBPASSWORD: '${PIHOLE_PASSWORD:-admin}'
+      FTLCONF_LOCAL_IPV4: '${PIHOLE_IP:-192.168.1.53}'
+    dns:
+      - 127.0.0.1
+      - 1.1.1.1
+    volumes:
+      - './pihole/etc-pihole:/etc/pihole'
+      - './pihole/etc-dnsmasq.d:/etc/dnsmasq.d'
+
+networks:
+  lan_physique:
+    name: lan_physique
+    driver: macvlan
+    driver_opts:
+      parent: ${PHYSICAL_INTERFACE:-enp4s0}
+    ipam:
+      config:
+        - subnet: ${SUBNET:-192.168.1.0/24}
+          gateway: ${GATEWAY_IP:-192.168.1.254}

@@ -1,0 +1,59 @@
+- Medias & Services:
+    - Immich Photos:
+        icon: immich.svg
+        href: http://photos.lan
+        description: Serveur de gestion photos & videos familial
+        container: immich-server
+        widget:
+          type: immich
+          url: http://immich-server:2283
+          key: ${IMMICH_API_KEY}
+
+- Domotique & Infrastructures:
+    - Home Assistant:
+        icon: home-assistant.svg
+        href: http://192.168.1.64:8123
+        description: Centralisation domotique & capteurs
+        container: homeassistant
+        widget:
+          type: homeassistant
+          url: http://192.168.1.64:8123
+          key: ${HA_LONG_LIVED_TOKEN}
+    - OpenThread Border Router:
+        icon: openthread.svg
+        href: http://192.168.1.64:8081
+        description: Reseau maillé Thread domotique
+        container: openthread
+    - Matter Server:
+        icon: matter.svg
+        href: http://192.168.1.64:5580
+        description: Controller Matter domotique
+        container: matter-server
+
+- Administration & Reseau:
+    - Pi-hole DNS:
+        icon: pi-hole.svg
+        href: http://192.168.1.53/admin
+        description: Blocage publicitaire & DNS LAN (192.168.1.53)
+        container: pihole
+        widget:
+          type: pihole
+          url: http://192.168.1.53
+          key: ${PIHOLE_API_KEY}
+    - Traefik Proxy:
+        icon: traefik.svg
+        href: http://traefik.lan:8080
+        description: Reverse Proxy & Routeur HTTP/HTTPS
+        container: traefik
+        widget:
+          type: traefik
+          url: http://traefik:8080
+    - Authentik SSO:
+        icon: authentik.svg
+        href: http://auth.lan
+        description: Fournisseur d'identite & Single Sign-On
+        container: authentik_server
+    - OpenMediaVault:
+        icon: openmediavault.svg
+        href: http://data.lan:81
+        description: Management NAS & Disques de stockage

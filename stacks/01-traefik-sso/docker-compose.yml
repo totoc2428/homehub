@@ -1,0 +1,137 @@
+# ==============================================================================
+# Stack 01: Traefik Reverse Proxy & Authentik SSO
+# Location: stacks/01-traefik-sso/docker-compose.yml
+# ==============================================================================
+
+services:
+  # --- TRAEFIK REVERSE PROXY ---
+  traefik:
+    image: traefik:v3.1
+    container_name: traefik
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - proxy
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080" # Traefik Dashboard (Internal)
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=proxy"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--providers.file.directory=/etc/traefik/dynamic"
+      - "--providers.file.watch=true"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/dynamic:/etc/traefik/dynamic:ro
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik-dashboard.rule=Host(`${DOMAIN_TRAEFIK:-traefik.lan}`)"
+      - "traefik.http.routers.traefik-dashboard.service=api@internal"
+
+  # --- AUTHENTIK SSO DATABASE ---
+  authentik-db:
+    image: postgres:16-alpine
+    container_name: authentik_db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      start_period: 20s
+      interval: 30s
+      retries: 5
+      timeout: 5s
+    environment:
+      POSTGRES_USER: ${AUTHENTIK_DB_USER:-authentik}
+      POSTGRES_PASSWORD: ${AUTHENTIK_DB_PASSWORD:-authentik_db_password_change_me}
+      POSTGRES_DB: ${AUTHENTIK_DB_NAME:-authentik}
+    volumes:
+      - authentik_db_data:/var/lib/postgresql/data
+    networks:
+      - authentik_internal
+
+  # --- AUTHENTIK SSO REDIS ---
+  authentik-redis:
+    image: redis:7-alpine
+    container_name: authentik_redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      start_period: 20s
+      interval: 30s
+      retries: 5
+      timeout: 3s
+    networks:
+      - authentik_internal
+
+  # --- AUTHENTIK SSO SERVER ---
+  authentik-server:
+    image: ghcr.io/goauthentik/server:2024.12.1
+    container_name: authentik_server
+    restart: unless-stopped
+    command: server
+    environment:
+      AUTHENTIK_REDIS__HOST: authentik-redis
+      AUTHENTIK_POSTGRESQL__HOST: authentik-db
+      AUTHENTIK_POSTGRESQL__USER: ${AUTHENTIK_DB_USER:-authentik}
+      AUTHENTIK_POSTGRESQL__NAME: ${AUTHENTIK_DB_NAME:-authentik}
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${AUTHENTIK_DB_PASSWORD:-authentik_db_password_change_me}
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY:-authentik_secret_key_change_me_super_secret}
+    volumes:
+      - ./authentik/media:/media
+      - ./authentik/custom-templates:/templates
+    networks:
+      - proxy
+      - authentik_internal
+    depends_on:
+      authentik-db:
+        condition: service_healthy
+      authentik-redis:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.authentik.rule=Host(`${DOMAIN_AUTH:-auth.lan}`) || HostRegexp(`{subdomain:[a-z0-9-]+}.lan`) && PathPrefix(`/outpost.goauthentik.io/`)"
+      - "traefik.http.routers.authentik.entrypoints=web"
+      - "traefik.http.services.authentik.loadbalancer.server.port=9000"
+
+  # --- AUTHENTIK SSO WORKER ---
+  authentik-worker:
+    image: ghcr.io/goauthentik/server:2024.12.1
+    container_name: authentik_worker
+    restart: unless-stopped
+    command: worker
+    environment:
+      AUTHENTIK_REDIS__HOST: authentik-redis
+      AUTHENTIK_POSTGRESQL__HOST: authentik-db
+      AUTHENTIK_POSTGRESQL__USER: ${AUTHENTIK_DB_USER:-authentik}
+      AUTHENTIK_POSTGRESQL__NAME: ${AUTHENTIK_DB_NAME:-authentik}
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${AUTHENTIK_DB_PASSWORD:-authentik_db_password_change_me}
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY:-authentik_secret_key_change_me_super_secret}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./authentik/media:/media
+      - ./authentik/certs:/certs
+      - ./authentik/custom-templates:/templates
+    networks:
+      - proxy
+      - authentik_internal
+    depends_on:
+      authentik-db:
+        condition: service_healthy
+      authentik-redis:
+        condition: service_healthy
+
+networks:
+  proxy:
+    external: true
+    name: proxy
+  authentik_internal:
+    driver: bridge
+    internal: true
+
+volumes:
+  authentik_db_data:

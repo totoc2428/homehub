@@ -1,0 +1,321 @@
+# ==============================================================================
+# OpenMediaVault HomeLab Architecture - Unified Docker Compose Stack
+# Location: stacks/docker-compose.yml
+# ==============================================================================
+
+services:
+  # ----------------------------------------------------------------------------
+  # 1. REVERSE PROXY & AUTHENTIK SSO STACK
+  # ----------------------------------------------------------------------------
+  traefik:
+    image: traefik:v3.1
+    container_name: traefik
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - proxy
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=proxy"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--providers.file.directory=/etc/traefik/dynamic"
+      - "--providers.file.watch=true"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./01-traefik-sso/traefik/dynamic:/etc/traefik/dynamic:ro
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik-dashboard.rule=Host(`${DOMAIN_TRAEFIK:-traefik.lan}`)"
+      - "traefik.http.routers.traefik-dashboard.service=api@internal"
+
+  authentik-db:
+    image: postgres:16-alpine
+    container_name: authentik_db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      start_period: 20s
+      interval: 30s
+      retries: 5
+      timeout: 5s
+    environment:
+      POSTGRES_USER: ${AUTHENTIK_DB_USER:-authentik}
+      POSTGRES_PASSWORD: ${AUTHENTIK_DB_PASSWORD:-authentik_db_password_change_me}
+      POSTGRES_DB: ${AUTHENTIK_DB_NAME:-authentik}
+    volumes:
+      - authentik_db_data:/var/lib/postgresql/data
+    networks:
+      - authentik_internal
+
+  authentik-redis:
+    image: redis:7-alpine
+    container_name: authentik_redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      start_period: 20s
+      interval: 30s
+      retries: 5
+      timeout: 3s
+    networks:
+      - authentik_internal
+
+  authentik-server:
+    image: ghcr.io/goauthentik/server:2024.12.1
+    container_name: authentik_server
+    restart: unless-stopped
+    command: server
+    environment:
+      AUTHENTIK_REDIS__HOST: authentik-redis
+      AUTHENTIK_POSTGRESQL__HOST: authentik-db
+      AUTHENTIK_POSTGRESQL__USER: ${AUTHENTIK_DB_USER:-authentik}
+      AUTHENTIK_POSTGRESQL__NAME: ${AUTHENTIK_DB_NAME:-authentik}
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${AUTHENTIK_DB_PASSWORD:-authentik_db_password_change_me}
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY:-authentik_secret_key_change_me_super_secret}
+    volumes:
+      - ./01-traefik-sso/authentik/media:/media
+      - ./01-traefik-sso/authentik/custom-templates:/templates
+    networks:
+      - proxy
+      - authentik_internal
+    depends_on:
+      authentik-db:
+        condition: service_healthy
+      authentik-redis:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.authentik.rule=Host(`${DOMAIN_AUTH:-auth.lan}`) || HostRegexp(`{subdomain:[a-z0-9-]+}.lan`) && PathPrefix(`/outpost.goauthentik.io/`)"
+      - "traefik.http.routers.authentik.entrypoints=web"
+      - "traefik.http.services.authentik.loadbalancer.server.port=9000"
+
+  authentik-worker:
+    image: ghcr.io/goauthentik/server:2024.12.1
+    container_name: authentik_worker
+    restart: unless-stopped
+    command: worker
+    environment:
+      AUTHENTIK_REDIS__HOST: authentik-redis
+      AUTHENTIK_POSTGRESQL__HOST: authentik-db
+      AUTHENTIK_POSTGRESQL__USER: ${AUTHENTIK_DB_USER:-authentik}
+      AUTHENTIK_POSTGRESQL__NAME: ${AUTHENTIK_DB_NAME:-authentik}
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${AUTHENTIK_DB_PASSWORD:-authentik_db_password_change_me}
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY:-authentik_secret_key_change_me_super_secret}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./01-traefik-sso/authentik/media:/media
+      - ./01-traefik-sso/authentik/certs:/certs
+      - ./01-traefik-sso/authentik/custom-templates:/templates
+    networks:
+      - proxy
+      - authentik_internal
+    depends_on:
+      authentik-db:
+        condition: service_healthy
+      authentik-redis:
+        condition: service_healthy
+
+  # ----------------------------------------------------------------------------
+  # 2. HOMEPAGE DASHBOARD STACK
+  # ----------------------------------------------------------------------------
+  homepage:
+    image: ghcr.io/gethomepage/homepage:latest
+    container_name: homepage
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./02-homepage/config:/app/config
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.homepage.rule=Host(`${DOMAIN_DASH:-home.lan}`) || Host(`dash.lan`)"
+      - "traefik.http.routers.homepage.entrypoints=web"
+      - "traefik.http.routers.homepage.middlewares=authentik@file"
+      - "traefik.http.services.homepage.loadbalancer.server.port=3000"
+
+  # ----------------------------------------------------------------------------
+  # 3. DNS & DHCP STACK (PI-HOLE MACVLAN)
+  # ----------------------------------------------------------------------------
+  pihole:
+    container_name: pihole
+    image: pihole/pihole:latest
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    networks:
+      lan_physique:
+        ipv4_address: ${PIHOLE_IP:-192.168.1.53}
+    environment:
+      TZ: '${TZ:-Europe/Paris}'
+      WEBPASSWORD: '${PIHOLE_PASSWORD:-admin}'
+      FTLCONF_LOCAL_IPV4: '${PIHOLE_IP:-192.168.1.53}'
+    dns:
+      - 127.0.0.1
+      - 1.1.1.1
+    volumes:
+      - './03-pihole/pihole/etc-pihole:/etc/pihole'
+      - './03-pihole/pihole/etc-dnsmasq.d:/etc/dnsmasq.d'
+
+  # ----------------------------------------------------------------------------
+  # 4. HOME AUTOMATION STACK (HOST MODE & USB PATHS)
+  # ----------------------------------------------------------------------------
+  homeassistant:
+    container_name: homeassistant
+    image: ghcr.io/home-assistant/home-assistant:stable
+    restart: unless-stopped
+    network_mode: host
+    privileged: true
+    environment:
+      - TZ=${TZ:-Europe/Paris}
+      - USB_ZIGBEE=${USB_ZIGBEE}
+    volumes:
+      - ./04-homeautomation/homeassistant/config:/config
+      - /etc/localtime:/etc/localtime:ro
+      - /run/dbus:/run/dbus:ro
+      - /dev/serial/by-path:/dev/serial/by-path
+    devices:
+      - ${USB_ZIGBEE:-/dev/serial/by-path/pci-0000:00:1a.0-usb-0:1.2:1.0-port0}:${USB_ZIGBEE:-/dev/serial/by-path/pci-0000:00:1a.0-usb-0:1.2:1.0-port0}
+
+  mosquitto:
+    container_name: mosquitto
+    image: eclipse-mosquitto:latest
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./04-homeautomation/mosquitto/config:/mosquitto/config
+      - ./04-homeautomation/mosquitto/data:/mosquitto/data
+      - ./04-homeautomation/mosquitto/log:/mosquitto/log
+
+  matter-server:
+    container_name: matter-server
+    image: ghcr.io/home-assistant-libs/python-matter-server:stable
+    restart: unless-stopped
+    network_mode: host
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    security_opt:
+      - apparmor=unconfined
+    volumes:
+      - ./04-homeautomation/matter/data:/data
+      - /run/dbus:/run/dbus:ro
+    command: ["--storage-path", "/data", "--paa-root-cert-dir", "/data/credentials", "--primary-interface", "${PHYSICAL_INTERFACE:-enp4s0}"]
+
+  openthread:
+    container_name: openthread
+    image: openthread/otbr:latest
+    restart: unless-stopped
+    network_mode: host
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    environment:
+      - WEB_GUI=0
+      - REST_API=1
+      - FIREWALL=0
+      - INFRA_IF_NAME=${PHYSICAL_INTERFACE:-enp4s0}
+      - BACKBONE_INTERFACE=${PHYSICAL_INTERFACE:-enp4s0}
+      - USB_THREAD=${USB_THREAD}
+    volumes:
+      - ./04-homeautomation/openthread_data:/var/lib/thread
+    devices:
+      - ${USB_THREAD:-/dev/serial/by-path/pci-0000:00:1a.0-usb-0:1.1:1.0-port0}:/dev/ttyThread
+    command: ["--radio-url", "spinel+hdlc+uart:///dev/ttyThread?uart-baudrate=230400&uart-flow-control"]
+
+  # ----------------------------------------------------------------------------
+  # 5. IMMICH MEDIA SERVER STACK (AUTHENTIK SSO PROTECTED)
+  # ----------------------------------------------------------------------------
+  immich-server:
+    container_name: immich_server
+    image: ghcr.io/immich-app/immich-server:release
+    command: ["start.sh", "immich"]
+    volumes:
+      - ./05-immich/upload:/usr/src/app/upload
+      - /etc/localtime:/etc/localtime:ro
+      - ${PHOTOS_MOUNT_POINT:-/srv/dev-disk-by-uuid-52E654B8E6549E53}/:/usr/src/app/external:ro
+    environment:
+      DB_PASSWORD: ${IMMICH_DB_PASSWORD:-immich_db_password_change_me}
+      DB_USERNAME: ${IMMICH_DB_USER:-postgres}
+      DB_DATABASE_NAME: ${IMMICH_DB_NAME:-immich}
+      DB_HOSTNAME: immich_postgres
+      REDIS_HOSTNAME: immich_redis
+      TZ: ${TZ:-Europe/Paris}
+    depends_on:
+      - immich-redis
+      - immich-postgres
+    restart: always
+    networks:
+      - immich_internal
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.immich.rule=Host(`${DOMAIN_PHOTOS:-photos.lan}`)"
+      - "traefik.http.routers.immich.entrypoints=web"
+      - "traefik.http.routers.immich.middlewares=authentik@file"
+      - "traefik.http.services.immich.loadbalancer.server.port=2283"
+      - "traefik.docker.network=proxy"
+
+  immich-machine-learning:
+    container_name: immich_machine_learning
+    image: ghcr.io/immich-app/immich-machine-learning:release
+    volumes:
+      - ./05-immich/model-cache:/cache
+    restart: always
+    networks:
+      - immich_internal
+
+  immich-redis:
+    container_name: immich_redis
+    image: redis:6.2-alpine
+    restart: always
+    networks:
+      - immich_internal
+
+  immich-postgres:
+    container_name: immich_postgres
+    image: tensorchord/pgvecto-rs:pg14-v0.2.0
+    environment:
+      POSTGRES_PASSWORD: ${IMMICH_DB_PASSWORD:-immich_db_password_change_me}
+      POSTGRES_USER: ${IMMICH_DB_USER:-postgres}
+      POSTGRES_DB: ${IMMICH_DB_NAME:-immich}
+    volumes:
+      - ./05-immich/postgres:/var/lib/postgresql/data
+    restart: always
+    networks:
+      - immich_internal
+
+networks:
+  proxy:
+    external: true
+    name: proxy
+  authentik_internal:
+    driver: bridge
+    internal: true
+  immich_internal:
+    driver: bridge
+  lan_physique:
+    name: lan_physique
+    driver: macvlan
+    driver_opts:
+      parent: ${PHYSICAL_INTERFACE:-enp4s0}
+    ipam:
+      config:
+        - subnet: ${SUBNET:-192.168.1.0/24}
+          gateway: ${GATEWAY_IP:-192.168.1.254}
+
+volumes:
+  authentik_db_data:
