@@ -1,59 +1,64 @@
-- Medias & Services:
+# ==============================================================================
+# Homepage Services Configuration (Google App Launcher Style)
+# Location: stacks/02-homepage/config/services.yaml
+# ==============================================================================
+
+- Medias & Photos:
     - Immich Photos:
         icon: immich.svg
         href: http://photos.lan
-        description: Serveur de gestion photos & videos familial
-        container: immich-server
+        description: Galerie & Sauvegarde photos familial (Protege par Authelia)
+        container: immich_server
         widget:
           type: immich
-          url: http://immich-server:2283
+          url: http://immich_server:2283
           key: ${IMMICH_API_KEY}
 
-- Domotique & Infrastructures:
+- Domotique & Reseau:
     - Home Assistant:
         icon: home-assistant.svg
         href: http://192.168.1.64:8123
-        description: Centralisation domotique & capteurs
+        description: Centralisation domotique & objets connectes
         container: homeassistant
         widget:
           type: homeassistant
           url: http://192.168.1.64:8123
-          key: ${HA_LONG_LIVED_TOKEN}
-    - OpenThread Border Router:
+          key: ${HA_API_KEY}
+    - OpenThread Router:
         icon: openthread.svg
         href: http://192.168.1.64:8081
-        description: Reseau maillé Thread domotique
+        description: Border Router Thread (USB ttyThread)
         container: openthread
     - Matter Server:
         icon: matter.svg
         href: http://192.168.1.64:5580
-        description: Controller Matter domotique
+        description: Controleur domotique Matter
         container: matter-server
 
-- Administration & Reseau:
+- Administration & Systeme:
     - Pi-hole DNS:
         icon: pi-hole.svg
         href: http://192.168.1.53/admin
-        description: Blocage publicitaire & DNS LAN (192.168.1.53)
+        description: Filtrage DNS local & Serveur DHCP (192.168.1.53)
         container: pihole
         widget:
           type: pihole
           url: http://192.168.1.53
-          key: ${PIHOLE_API_KEY}
+          key: ${PIHOLE_PASSWORD}
+    - Authelia SSO:
+        icon: authelia.svg
+        href: http://auth.lan
+        description: Single Sign-On & Authentification centralisee
+        container: authelia
     - Traefik Proxy:
         icon: traefik.svg
-        href: http://traefik.lan:8080
-        description: Reverse Proxy & Routeur HTTP/HTTPS
+        href: http://traefik.lan
+        description: Routeur Reverse Proxy HTTP/HTTPS (Admin Only)
         container: traefik
         widget:
           type: traefik
           url: http://traefik:8080
-    - Authentik SSO:
-        icon: authentik.svg
-        href: http://auth.lan
-        description: Fournisseur d'identite & Single Sign-On
-        container: authentik_server
     - OpenMediaVault:
         icon: openmediavault.svg
         href: http://data.lan:81
-        description: Management NAS & Disques de stockage
+        description: Administration NAS & Partages (Admin Only)

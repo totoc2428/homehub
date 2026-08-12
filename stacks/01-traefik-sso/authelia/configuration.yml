@@ -1,0 +1,85 @@
+# ==============================================================================
+# Authelia SSO Main Configuration
+# Location: stacks/01-traefik-sso/authelia/configuration.yml
+# ==============================================================================
+
+theme: auto
+
+server:
+  host: 0.0.0.0
+  port: 9091
+  buffers:
+    read: 4096
+    write: 4096
+
+log:
+  level: info
+  format: text
+
+default_redirection_url: http://home.lan
+
+totp:
+  issuer: authelia.lan
+
+authentication_backend:
+  file:
+    path: /config/users_database.yml
+    password:
+      algorithm: argon2id
+      argon2id:
+        time: 3
+        memory: 65536
+        parallelism: 4
+
+access_control:
+  default_policy: deny
+  networks:
+    - name: internal_lan
+      networks:
+        - 192.168.1.0/24
+        - 172.16.0.0/12
+  rules:
+    # 1. Bypass authentication for Authelia portal itself
+    - domain: auth.lan
+      policy: bypass
+
+    # 2. Family group access for general services (Homepage & Immich)
+    - domain: home.lan
+      policy: one_factor
+      subject: "group:Family"
+
+    - domain: photos.lan
+      policy: one_factor
+      subject: "group:Family"
+
+    # 3. Admin-only access restriction (Traefik Dashboard & OpenMediaVault)
+    - domain: traefik.lan
+      policy: one_factor
+      subject: "group:admin"
+
+    - domain: data.lan
+      policy: one_factor
+      subject: "group:admin"
+
+session:
+  name: authelia_session
+  same_site: lax
+  expiration: 3600
+  inactivity: 300
+  domain: lan
+  cookies:
+    - domain: lan
+      authelia_url: http://auth.lan
+
+regulation:
+  max_retries: 3
+  find_time: 120
+  ban_time: 300
+
+storage:
+  local:
+    path: /config/db.sqlite3
+
+notifier:
+  filesystem:
+    filename: /config/notification.txt

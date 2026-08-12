@@ -1,0 +1,55 @@
+# ==============================================================================
+# Authelia SSO User Database
+# Location: stacks/01-traefik-sso/authelia/users_database.yml
+# ==============================================================================
+
+users:
+  charles.coude:
+    disabled: false
+    displayname: "Charles Coudé"
+    password: "$argon2id$v=19$m=65536,t=3,p=4$c29tZXNhbHQ$5rXkZ9j5j5j5j5j5j5j5j5j5j5j5j5j5j5j5j5j5j5" # Change me using 'docker run authelia/authelia authelia crypto hash generate'
+    email: "charles.coude@example.com"
+    groups:
+      - Family
+      - admin
+
+  dominique.coude:
+    disabled: false
+    displayname: "Dominique Coudé"
+    password: "$argon2id$v=19$m=65536,t=3,p=4$c29tZXNhbHQ$5rXkZ9j5j5j5j5j5j5j5j5j5j5j5j5j5j5j5j5j5j5"
+    email: "dominique.coude@example.com"
+    groups:
+      - Family
+      - admin
+
+  annouk.coude:
+    disabled: false
+    displayname: "Annouk Coudé"
+    password: "$argon2id$v=19$m=65536,t=3,p=4$c29tZXNhbHQ$5rXkZ9j5j5j5j5j5j5j5j5j5j5j5j5j5j5j5j5j5j5"
+    email: "annouk.coude@example.com"
+    groups:
+      - Family
+
+  anne.coude:
+    disabled: false
+    displayname: "Anne Coudé"
+    password: "$argon2id$v=19$m=65536,t=3,p=4$c29tZXNhbHQ$5rXkZ9j5j5j5j5j5j5j5j5j5j5j5j5j5j5j5j5j5j5"
+    email: "anne.coude@example.com"
+    groups:
+      - Family
+
+  agathe.coude:
+    disabled: false
+    displayname: "Agathe Coudé"
+    password: "$argon2id$v=19$m=65536,t=3,p=4$c29tZXNhbHQ$5rXkZ9j5j5j5j5j5j5j5j5j5j5j5j5j5j5j5j5j5j5"
+    email: "agathe.coude@example.com"
+    groups:
+      - Family
+
+  hermine.coude:
+    disabled: false
+    displayname: "Hermine Coudé"
+    password: "$argon2id$v=19$m=65536,t=3,p=4$c29tZXNhbHQ$5rXkZ9j5j5j5j5j5j5j5j5j5j5j5j5j5j5j5j5j5j5"
+    email: "hermine.coude@example.com"
+    groups:
+      - Family

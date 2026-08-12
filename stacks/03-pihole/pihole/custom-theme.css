@@ -1,0 +1,28 @@
+/* ==============================================================================
+   Pi-hole Dark Material / Google Infinity Glassmorphism Theme Injection
+   Location: stacks/03-pihole/pihole/custom-theme.css
+   ============================================================================== */
+
+:root {
+  --ph-bg-dark: #0b0f19;
+  --ph-card-bg: #111827;
+  --ph-accent: #6366f1;
+  --ph-text: #f8fafc;
+}
+
+body.dark-mode, body {
+  background-color: var(--ph-bg-dark) !important;
+  color: var(--ph-text) !important;
+  font-family: 'Inter', system-ui, sans-serif !important;
+}
+
+.card, .small-box, .box {
+  border-radius: 16px !important;
+  background-color: var(--ph-card-bg) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+}
+
+.main-header, .main-sidebar, .sidebar {
+  background-color: #0b0f19 !important;
+}
